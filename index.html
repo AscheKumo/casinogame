@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Royal Flush Casino - 5 Card Poker</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="game-container">
+        <header>
+            <h1>Royal Flush Casino</h1>
+            <div class="stats">
+                <div class="balance">Balance: <span id="balance">500</span>gc</div>
+                <div class="jackpot">Jackpot: <span id="jackpot">0</span>gc</div>
+            </div>
+        </header>
+
+        <!-- Main Game Area -->
+        <div id="main-game" class="game-section active">
+            <div class="betting-area">
+                <div class="insurance-indicator" id="insurance-indicator">
+                    Insurance Active (<span id="insurance-rounds">0</span> rounds)
+                </div>
+                <label for="bet-amount">Bet Amount:</label>
+                <input type="number" id="bet-amount" min="1" max="500" value="10">
+                <button id="deal-btn" class="btn primary">Deal Cards</button>
+            </div>
+
+            <div class="cards-area" id="cards-area">
+                <div class="lucky-charm-indicator" id="lucky-charm-indicator">
+                    Lucky Charm Active (<span id="lucky-rounds">0</span> rounds)
+                </div>
+                <!-- Cards will be dynamically inserted here -->
+            </div>
+
+            <div class="action-area" id="action-area" style="display: none;">
+                <button id="discard-btn" class="btn secondary">Discard Selected</button>
+                <button id="hold-btn" class="btn primary">Hold All</button>
+            </div>
+
+            <div class="result-area" id="result-area" style="display: none;">
+                <h2 id="hand-result"></h2>
+                <p id="winnings"></p>
+                <button id="double-btn" class="btn gold">Double or Nothing</button>
+                <button id="collect-btn" class="btn primary">Collect Winnings</button>
+            </div>
+        </div>
+
+        <!-- Double or Nothing Game -->
+        <div id="double-game" class="game-section" style="display: none;">
+            <h2>Double or Nothing - High/Low</h2>
+            <div class="double-stats">
+                <p>Current Winnings: <span id="current-winnings">0</span>gc</p>
+                <p>Round: <span id="double-round">1</span>/10</p>
+            </div>
+            <div class="double-cards">
+                <div class="card-slot">
+                    <div id="shown-card" class="card"></div>
+                    <p>Current Card</p>
+                </div>
+                <div class="card-slot">
+                    <div id="mystery-card" class="card back"></div>
+                    <p>Next Card</p>
+                </div>
+            </div>
+            <div class="double-actions">
+                <button id="high-btn" class="btn high">Higher</button>
+                <button id="low-btn" class="btn low">Lower</button>
+                <button id="cash-out-btn" class="btn gold">Cash Out</button>
+            </div>
+        </div>
+
+        <!-- Trash Collection Minigame -->
+        <div id="trash-game" class="game-section" style="display: none;">
+            <h2>Trash Collection - Earn 1gc per item</h2>
+            <div class="trash-stats">
+                <p>Items Collected: <span id="trash-collected">0</span></p>
+                <p>Earned: <span id="trash-earned">0</span>gc</p>
+            </div>
+            <div id="trash-area" class="trash-area">
+                <!-- Trash items will spawn here -->
+            </div>
+            <button id="exit-trash-btn" class="btn primary">Back to Game</button>
+        </div>
+
+        <!-- Power-ups Shop -->
+        <div id="shop" class="game-section" style="display: none;">
+            <h2>Power-ups Shop</h2>
+            <div class="shop-items">
+                <div class="shop-item">
+                    <h3>Wild Card</h3>
+                    <p>Adds a permanent wild card to the deck (removed when used)</p>
+                    <p class="price">Cost: 100gc</p>
+                    <button class="btn buy-btn" data-item="wildcard">Buy</button>
+                </div>
+                <div class="shop-item">
+                    <h3>Passive Income</h3>
+                    <p>Earn 5gc per round automatically</p>
+                    <p class="price">Cost: 200gc</p>
+                    <button class="btn buy-btn" data-item="passive">Buy</button>
+                </div>
+                <div class="shop-item">
+                    <h3>Lucky Charm</h3>
+                    <p>+10% chance for better hands (5 rounds)</p>
+                    <p class="price">Cost: 150gc</p>
+                    <button class="btn buy-btn" data-item="lucky">Buy</button>
+                </div>
+                <div class="shop-item">
+                    <h3>Insurance</h3>
+                    <p>Keep 50% of bet on loss (3 rounds)</p>
+                    <p class="price">Cost: 75gc</p>
+                    <button class="btn buy-btn" data-item="insurance">Buy</button>
+                </div>
+            </div>
+            <button id="close-shop-btn" class="btn primary">Close Shop</button>
+        </div>
+
+        <!-- Navigation -->
+        <nav class="game-nav">
+            <button class="nav-btn" data-section="main-game">Play</button>
+            <button class="nav-btn" data-section="trash-game">Earn GC</button>
+            <button class="nav-btn" data-section="shop">Shop</button>
+        </nav>
+
+        <!-- Active Power-ups Display -->
+        <div class="active-powerups" id="active-powerups">
+            <h4>Active Power-ups:</h4>
+            <div id="powerup-list"></div>
+        </div>
+    </div>
+
+    <script src="game.js"></script>
+</body>
+</html>
