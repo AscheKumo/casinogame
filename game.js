@@ -10,8 +10,8 @@ const gameState = {
     hasDiscarded: false,
     isAnimating: false,
     powerups: {
-        wildcardsInDeck: 0,  // Changed from wildcard rounds to wildcards in deck
-        passive: false,
+        wildcardsInDeck: 0,
+        passiveIncome: 0,  // Changed to track amount instead of boolean
         lucky: 0,
         insurance: 0
     }
@@ -126,9 +126,10 @@ async function dealCards() {
     
     gameState.isAnimating = true;
     
-    // Apply passive income
-    if (gameState.powerups.passive) {
-        gameState.balance += 5;
+    // Apply passive income with animation
+    if (gameState.powerups.passiveIncome > 0) {
+        await animatePassiveIncome(gameState.powerups.passiveIncome);
+        gameState.balance += gameState.powerups.passiveIncome;
     }
     
     gameState.currentBet = bet;
@@ -156,6 +157,38 @@ async function dealCards() {
     
     gameState.isAnimating = false;
     updateDisplay();
+}
+
+// Animate passive income
+async function animatePassiveIncome(amount) {
+    const container = document.createElement('div');
+    container.className = 'passive-income-container';
+    document.body.appendChild(container);
+    
+    // Create falling coins
+    for (let i = 0; i < amount; i++) {
+        setTimeout(() => {
+            const coin = document.createElement('div');
+            coin.className = 'falling-coin';
+            coin.innerHTML = '🪙';
+            coin.style.left = Math.random() * window.innerWidth + 'px';
+            coin.style.animationDelay = Math.random() * 0.5 + 's';
+            container.appendChild(coin);
+            
+            // Remove coin after animation
+            setTimeout(() => coin.remove(), 2000);
+        }, i * 100);
+    }
+    
+    // Show income message
+    const message = document.createElement('div');
+    message.className = 'passive-income-message';
+    message.textContent = `+${amount}gc Passive Income!`;
+    container.appendChild(message);
+    
+    // Clean up
+    setTimeout(() => container.remove(), 3000);
+    await sleep(1500);
 }
 
 // Deal single card with animation
@@ -554,6 +587,7 @@ function startTrashGame() {
     trashArea.innerHTML = '';
     
     let collected = 0;
+    let coinsFound = 0;
     document.getElementById('trash-collected').textContent = '0';
     document.getElementById('trash-earned').textContent = '0';
     
@@ -566,32 +600,61 @@ function startTrashGame() {
         }
         
         const trash = document.createElement('div');
-        trash.className = 'trash-item';
-        trash.innerHTML = trashEmojis[Math.floor(Math.random() * trashEmojis.length)];
+        
+        // 1 in 50 chance for a rare coin
+        const isRareCoin = Math.random() < 0.02; // 2% chance = 1 in 50
+        
+        if (isRareCoin) {
+            trash.className = 'trash-item rare-coin';
+            trash.innerHTML = '💰';
+        } else {
+            trash.className = 'trash-item';
+            trash.innerHTML = trashEmojis[Math.floor(Math.random() * trashEmojis.length)];
+        }
+        
         trash.style.left = Math.random() * (trashArea.offsetWidth - 50) + 'px';
         trash.style.top = Math.random() * (trashArea.offsetHeight - 50) + 'px';
         
         trash.addEventListener('click', () => {
             trash.classList.add('collecting');
-            setTimeout(() => {
-                trash.remove();
+            
+            if (isRareCoin) {
+                // Show special effect for rare coin
+                const bonus = document.createElement('div');
+                bonus.className = 'coin-bonus-text';
+                bonus.textContent = '+100gc!!!';
+                bonus.style.left = trash.style.left;
+                bonus.style.top = trash.style.top;
+                trashArea.appendChild(bonus);
+                
+                setTimeout(() => bonus.remove(), 1500);
+                
+                coinsFound++;
+                gameState.balance += 100;
+                document.getElementById('trash-earned').textContent = collected + (coinsFound * 100);
+            } else {
                 collected++;
                 gameState.balance++;
                 document.getElementById('trash-collected').textContent = collected;
-                document.getElementById('trash-earned').textContent = collected;
-                updateDisplay();
+                document.getElementById('trash-earned').textContent = collected + (coinsFound * 100);
+            }
+            
+            updateDisplay();
+            
+            setTimeout(() => {
+                trash.remove();
             }, 300);
         });
         
         trashArea.appendChild(trash);
         
-        // Remove after 3 seconds if not clicked
+        // Remove after 3 seconds if not clicked (rare coins last longer)
         setTimeout(() => {
             if (trash.parentNode) {
                 trash.style.opacity = '0.3';
                 setTimeout(() => trash.remove(), 500);
             }
-        }, 3000);
+        }, isRareCoin ? 5000 : 3000);
     };
     
     // Initial spawn
@@ -614,7 +677,7 @@ function exitTrashGame() {
     showSection('main-game');
 }
 
-// Buy powerup - UPDATED for new wildcard system
+// Buy powerup - Updated to allow stacking
 function buyPowerup(item) {
     const costs = {
         wildcard: 100,
@@ -638,8 +701,9 @@ function buyPowerup(item) {
             alert(`Wild Card added to deck! Total wildcards in deck: ${gameState.powerups.wildcardsInDeck}`);
             break;
         case 'passive':
-            gameState.powerups.passive = true;
-            alert('Passive Income activated! +5gc per round forever.');
+            // Increase passive income by 5
+            gameState.powerups.passiveIncome += 5;
+            alert(`Passive Income increased! Now earning ${gameState.powerups.passiveIncome}gc per round.`);
             break;
         case 'lucky':
             // Add 5 rounds
@@ -695,8 +759,8 @@ function updateDisplay() {
     if (gameState.powerups.wildcardsInDeck > 0) {
         addPowerupDisplay(`Wild Cards in deck: ${gameState.powerups.wildcardsInDeck}`);
     }
-    if (gameState.powerups.passive) {
-        addPowerupDisplay('Passive Income (+5gc/round)');
+    if (gameState.powerups.passiveIncome > 0) {
+        addPowerupDisplay(`Passive Income: +${gameState.powerups.passiveIncome}gc/round`);
     }
     if (gameState.powerups.lucky > 0) {
         addPowerupDisplay(`Lucky Charm (${gameState.powerups.lucky} rounds)`);
@@ -743,16 +807,24 @@ function loadGameState() {
             gameState.jackpot = data.jackpot || 0;
             gameState.powerups = data.powerups || {
                 wildcardsInDeck: 0,
-                passive: false,
+                passiveIncome: 0,
                 lucky: 0,
                 insurance: 0
             };
             
             // Handle old save format
-            if (data.powerups && typeof data.powerups.wildcard === 'number') {
-                // Convert old wildcard rounds to wildcards in deck
-                gameState.powerups.wildcardsInDeck = Math.ceil(data.powerups.wildcard / 5);
-                delete gameState.powerups.wildcard;
+            if (data.powerups) {
+                // Convert old wildcard format
+                if (typeof data.powerups.wildcard === 'number') {
+                    gameState.powerups.wildcardsInDeck = Math.ceil(data.powerups.wildcard / 5);
+                    delete gameState.powerups.wildcard;
+                }
+                // Convert old passive boolean to number
+                if (typeof data.powerups.passive === 'boolean' && data.powerups.passive) {
+                    gameState.powerups.passiveIncome = 5;
+                } else if (typeof data.powerups.passiveIncome === 'undefined') {
+                    gameState.powerups.passiveIncome = 0;
+                }
             }
             
             // Welcome back message if returning player
