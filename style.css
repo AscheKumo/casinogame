@@ -47,6 +47,69 @@ h1 {
     border-radius: 10px;
 }
 
+/* Passive Income Animation */
+.passive-income-container {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+    z-index: 1000;
+}
+
+.falling-coin {
+    position: absolute;
+    top: -50px;
+    font-size: 3em;
+    animation: coinFall 2s ease-in forwards;
+    filter: drop-shadow(0 0 10px rgba(255, 215, 0, 0.8));
+}
+
+@keyframes coinFall {
+    0% {
+        transform: translateY(0) rotate(0deg);
+        opacity: 1;
+    }
+    100% {
+        transform: translateY(calc(100vh + 50px)) rotate(720deg);
+        opacity: 0.3;
+    }
+}
+
+.passive-income-message {
+    position: fixed;
+    top: 20%;
+    left: 50%;
+    transform: translateX(-50%);
+    background: linear-gradient(135deg, #ffd700, #ff8c00);
+    color: #000;
+    padding: 15px 30px;
+    border-radius: 30px;
+    font-size: 1.5em;
+    font-weight: bold;
+    box-shadow: 0 5px 20px rgba(255, 215, 0, 0.6);
+    animation: incomeMessage 2s ease-out forwards;
+}
+
+@keyframes incomeMessage {
+    0% {
+        transform: translateX(-50%) translateY(-20px) scale(0.8);
+        opacity: 0;
+    }
+    20% {
+        transform: translateX(-50%) translateY(0) scale(1.1);
+        opacity: 1;
+    }
+    40% {
+        transform: translateX(-50%) translateY(0) scale(1);
+    }
+    100% {
+        transform: translateX(-50%) translateY(0) scale(1);
+        opacity: 0;
+    }
+}
+
 .game-section {
     display: none;
     min-height: 400px;
@@ -452,9 +515,59 @@ h1 {
     box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
 }
 
+/* Rare coin styling */
+.trash-item.rare-coin {
+    background: linear-gradient(135deg, #ffd700, #ff8c00, #ffd700);
+    box-shadow: 0 0 20px rgba(255, 215, 0, 0.8), 0 0 40px rgba(255, 215, 0, 0.4);
+    animation: trashSpawn 0.5s ease-out, rareCoinPulse 1s ease-in-out infinite;
+    font-size: 2.2em;
+}
+
+@keyframes rareCoinPulse {
+    0%, 100% {
+        transform: scale(1) rotate(0deg);
+        box-shadow: 0 0 20px rgba(255, 215, 0, 0.8), 0 0 40px rgba(255, 215, 0, 0.4);
+    }
+    50% {
+        transform: scale(1.15) rotate(10deg);
+        box-shadow: 0 0 30px rgba(255, 215, 0, 1), 0 0 60px rgba(255, 215, 0, 0.6);
+    }
+}
+
+.coin-bonus-text {
+    position: absolute;
+    color: #ffd700;
+    font-size: 2em;
+    font-weight: bold;
+    text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.8);
+    animation: bonusFloat 1.5s ease-out forwards;
+    pointer-events: none;
+    z-index: 10;
+}
+
+@keyframes bonusFloat {
+    0% {
+        transform: translateY(0) scale(0.5);
+        opacity: 0;
+    }
+    20% {
+        transform: translateY(-20px) scale(1.2);
+        opacity: 1;
+    }
+    100% {
+        transform: translateY(-100px) scale(1);
+        opacity: 0;
+    }
+}
+
 .trash-item:hover {
     transform: scale(1.3) rotate(10deg);
     box-shadow: 0 6px 12px rgba(255, 215, 0, 0.5);
+}
+
+.trash-item.rare-coin:hover {
+    transform: scale(1.4) rotate(15deg);
+    box-shadow: 0 0 40px rgba(255, 215, 0, 1);
 }
 
 @keyframes collectTrash {
