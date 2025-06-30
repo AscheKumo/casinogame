@@ -9,12 +9,17 @@ const gameState = {
     doubleRound: 0,
     hasDiscarded: false,
     isAnimating: false,
-    trashGameInterval: null,  // Add this to track the interval
+    trashGameInterval: null,
     powerups: {
         wildcardsInDeck: 0,
-        passiveIncome: 0,  // Changed to track amount instead of boolean
+        passiveIncome: 0,
         lucky: 0,
-        insurance: 0
+        insurance: 0,
+        doubleOrNothingMaster: false,
+        mulligan: 0,
+        jokersWild: 0,
+        compoundInterest: 0,
+        compoundInterestPurchases: 0
     }
 };
 
@@ -127,6 +132,15 @@ async function dealCards() {
     
     gameState.isAnimating = true;
     
+    // Apply compound interest
+    if (gameState.powerups.compoundInterest > 0) {
+        const interest = Math.floor(gameState.balance * (gameState.powerups.compoundInterest / 100));
+        if (interest > 0) {
+            gameState.balance += interest;
+            await animateCompoundInterest(interest);
+        }
+    }
+    
     // Apply passive income with animation
     if (gameState.powerups.passiveIncome > 0) {
         await animatePassiveIncome(gameState.powerups.passiveIncome);
@@ -142,9 +156,12 @@ async function dealCards() {
     gameState.currentHand = deck.slice(0, 5);
     
     // Clear cards area (except indicators)
-    const indicators = cardsArea.querySelectorAll('.lucky-charm-indicator');
+    const indicators = cardsArea.querySelectorAll('.lucky-charm-indicator, .jokers-wild-indicator, .mulligan-indicator');
     cardsArea.innerHTML = '';
     indicators.forEach(ind => cardsArea.appendChild(ind));
+    
+    // Update indicators
+    updateCardAreaIndicators();
     
     // Deal cards with animation
     for (let i = 0; i < 5; i++) {
@@ -156,8 +173,116 @@ async function dealCards() {
     resultArea.style.display = 'none';
     dealBtn.disabled = true;
     
+    // Show mulligan button if available
+    if (gameState.powerups.mulligan > 0) {
+        const mulliganBtn = document.getElementById('mulligan-btn');
+        if (mulliganBtn) {
+            mulliganBtn.style.display = 'inline-block';
+        }
+    }
+    
     gameState.isAnimating = false;
     updateDisplay();
+}
+
+// Animate compound interest
+async function animateCompoundInterest(amount) {
+    const container = document.createElement('div');
+    container.className = 'compound-interest-container';
+    container.innerHTML = `<div class="compound-interest-text">+${amount}gc (${gameState.powerups.compoundInterest}% interest)</div>`;
+    document.body.appendChild(container);
+    
+    setTimeout(() => container.remove(), 2500);
+    await sleep(1000);
+}
+
+// Use mulligan
+async function useMulligan() {
+    if (gameState.powerups.mulligan <= 0 || gameState.isAnimating) return;
+    
+    gameState.isAnimating = true;
+    gameState.powerups.mulligan--;
+    
+    // Animate cards swirling away
+    const cards = cardsArea.querySelectorAll('.card');
+    cards.forEach((card, index) => {
+        setTimeout(() => {
+            card.style.animation = 'mulliganSwirl 0.6s ease-out forwards';
+        }, index * 50);
+    });
+    
+    await sleep(800);
+    
+    // Deal new hand
+    const deck = shuffleDeck(createDeck());
+    gameState.currentHand = deck.slice(0, 5);
+    gameState.selectedCards = [];
+    
+    // Clear cards
+    cards.forEach(card => card.remove());
+    
+    // Deal new cards
+    for (let i = 0; i < 5; i++) {
+        await dealSingleCard(i);
+        await sleep(100);
+    }
+    
+    // Hide mulligan button if no more uses
+    if (gameState.powerups.mulligan <= 0) {
+        const mulliganBtn = document.getElementById('mulligan-btn');
+        if (mulliganBtn) {
+            mulliganBtn.style.display = 'none';
+        }
+    }
+    
+    gameState.isAnimating = false;
+    updateDisplay();
+}
+
+// Update card area indicators
+function updateCardAreaIndicators() {
+    // Lucky charm indicator
+    if (gameState.powerups.lucky > 0) {
+        if (!luckyCharmIndicatorEl.parentNode) {
+            cardsArea.appendChild(luckyCharmIndicatorEl);
+        }
+        luckyCharmIndicatorEl.classList.add('active');
+        luckyRoundsEl.textContent = gameState.powerups.lucky;
+    } else {
+        luckyCharmIndicatorEl.classList.remove('active');
+    }
+    
+    // Joker's Wild indicator
+    let jokersIndicator = document.getElementById('jokers-wild-indicator');
+    if (gameState.powerups.jokersWild > 0) {
+        if (!jokersIndicator) {
+            jokersIndicator = document.createElement('div');
+            jokersIndicator.id = 'jokers-wild-indicator';
+            jokersIndicator.className = 'jokers-wild-indicator';
+            jokersIndicator.innerHTML = `Joker's Wild Active (<span id="jokers-rounds">0</span> rounds)`;
+            cardsArea.appendChild(jokersIndicator);
+        }
+        jokersIndicator.classList.add('active');
+        document.getElementById('jokers-rounds').textContent = gameState.powerups.jokersWild;
+    } else if (jokersIndicator) {
+        jokersIndicator.classList.remove('active');
+    }
+    
+    // Mulligan indicator
+    let mulliganIndicator = document.getElementById('mulligan-indicator');
+    if (gameState.powerups.mulligan > 0) {
+        if (!mulliganIndicator) {
+            mulliganIndicator = document.createElement('div');
+            mulliganIndicator.id = 'mulligan-indicator';
+            mulliganIndicator.className = 'mulligan-indicator';
+            mulliganIndicator.innerHTML = `Mulligans: <span id="mulligan-count">0</span>`;
+            cardsArea.appendChild(mulliganIndicator);
+        }
+        mulliganIndicator.classList.add('active');
+        document.getElementById('mulligan-count').textContent = gameState.powerups.mulligan;
+    } else if (mulliganIndicator) {
+        mulliganIndicator.classList.remove('active');
+    }
 }
 
 // Animate passive income
@@ -197,12 +322,15 @@ function dealSingleCard(index) {
     return new Promise(resolve => {
         const card = gameState.currentHand[index];
         const cardEl = document.createElement('div');
-        const isWild = card.isWild;
+        const isWild = card.isWild || (gameState.powerups.jokersWild > 0 && card.rank === 'J');
         const isLucky = gameState.powerups.lucky > 0;
         
         let cardClass = `card dealing`;
         if (isWild) {
             cardClass += ' wild';
+            if (card.rank === 'J' && gameState.powerups.jokersWild > 0) {
+                cardClass += ' joker-wild';
+            }
         } else {
             cardClass += isLucky ? ' lucky' : '';
             cardClass += ['♥', '♦'].includes(card.suit) ? ' red' : ' black';
@@ -229,7 +357,8 @@ function dealSingleCard(index) {
 function toggleCardSelection(index) {
     if (gameState.hasDiscarded || gameState.isAnimating) return;
     
-    const cardEl = cardsArea.children[index + (gameState.powerups.lucky > 0 ? 1 : 0)]; // Account for indicator
+    const indicatorCount = cardsArea.querySelectorAll('.lucky-charm-indicator.active, .jokers-wild-indicator.active, .mulligan-indicator.active').length;
+    const cardEl = cardsArea.children[index + indicatorCount];
     
     if (gameState.selectedCards.includes(index)) {
         gameState.selectedCards = gameState.selectedCards.filter(i => i !== index);
@@ -253,9 +382,11 @@ async function discardSelected() {
     const deck = shuffleDeck(createDeck());
     let deckIndex = 0;
     
+    const indicatorCount = cardsArea.querySelectorAll('.lucky-charm-indicator.active, .jokers-wild-indicator.active, .mulligan-indicator.active').length;
+    
     // Animate discarding cards
     for (const cardIndex of gameState.selectedCards) {
-        const cardEl = cardsArea.children[cardIndex + (gameState.powerups.lucky > 0 ? 1 : 0)];
+        const cardEl = cardsArea.children[cardIndex + indicatorCount];
         cardEl.classList.add('discarding');
     }
     
@@ -265,13 +396,16 @@ async function discardSelected() {
     for (const cardIndex of gameState.selectedCards) {
         gameState.currentHand[cardIndex] = deck[deckIndex++];
         const card = gameState.currentHand[cardIndex];
-        const cardEl = cardsArea.children[cardIndex + (gameState.powerups.lucky > 0 ? 1 : 0)];
-        const isWild = card.isWild;
+        const cardEl = cardsArea.children[cardIndex + indicatorCount];
+        const isWild = card.isWild || (gameState.powerups.jokersWild > 0 && card.rank === 'J');
         const isLucky = gameState.powerups.lucky > 0;
         
         let cardClass = `card new-card`;
         if (isWild) {
             cardClass += ' wild';
+            if (card.rank === 'J' && gameState.powerups.jokersWild > 0) {
+                cardClass += ' joker-wild';
+            }
         } else {
             cardClass += isLucky ? ' lucky' : '';
             cardClass += ['♥', '♦'].includes(card.suit) ? ' red' : ' black';
@@ -294,6 +428,7 @@ async function discardSelected() {
     gameState.isAnimating = false;
     
     discardBtn.style.display = 'none';
+    document.getElementById('mulligan-btn').style.display = 'none';
     
     // Wait a moment before evaluating
     await sleep(1000);
@@ -308,7 +443,7 @@ async function evaluateHand(fromDiscard) {
     const result = getHandRank(hand);
     
     // Count and remove used wildcards from deck
-    const wildcardsUsed = hand.filter(card => card.isWild).length;
+    const wildcardsUsed = hand.filter(card => card.isWild && card.rank === 'W').length;
     if (wildcardsUsed > 0) {
         gameState.powerups.wildcardsInDeck -= wildcardsUsed;
         console.log(`Used ${wildcardsUsed} wildcard(s). ${gameState.powerups.wildcardsInDeck} remaining in deck.`);
@@ -352,6 +487,7 @@ async function evaluateHand(fromDiscard) {
     
     // Update powerup counters
     if (gameState.powerups.lucky > 0) gameState.powerups.lucky--;
+    if (gameState.powerups.jokersWild > 0) gameState.powerups.jokersWild--;
     
     updateDisplay();
 }
@@ -367,6 +503,11 @@ function getHandRank(hand) {
         else if (value === 'A') value = 14;
         else if (value === 'W') value = 0; // Wildcard
         else value = parseInt(value);
+        
+        // Joker's Wild - treat all Jacks as wildcards
+        if (gameState.powerups.jokersWild > 0 && card.rank === 'J') {
+            value = 0;
+        }
         
         return { ...card, value };
     });
@@ -480,7 +621,39 @@ function showNextCard() {
     
     shownCardEl.dataset.value = getCardValue(card.rank);
     
+    // Show probability if Double or Nothing Master is active
+    if (gameState.powerups.doubleOrNothingMaster) {
+        const currentValue = parseInt(shownCardEl.dataset.value);
+        updateProbabilityDisplay(currentValue);
+    }
+    
     document.getElementById('mystery-card').className = 'card back';
+}
+
+// Update probability display for Double or Nothing Master
+function updateProbabilityDisplay(currentValue) {
+    let probContainer = document.getElementById('probability-display');
+    if (!probContainer) {
+        probContainer = document.createElement('div');
+        probContainer.id = 'probability-display';
+        probContainer.className = 'probability-display';
+        document.querySelector('.double-cards').appendChild(probContainer);
+    }
+    
+    // Calculate probabilities
+    const totalCards = 13;
+    const higherCards = totalCards - currentValue + 1;
+    const lowerCards = currentValue - 2; // -2 because we don't count the current card
+    
+    const higherProb = Math.round((higherCards / totalCards) * 100);
+    const lowerProb = Math.round((lowerCards / totalCards) * 100);
+    const tieProb = Math.round((1 / totalCards) * 100);
+    
+    probContainer.innerHTML = `
+        <div class="prob-item high">Higher: ${higherProb}%</div>
+        <div class="prob-item tie">Tie: ${tieProb}%</div>
+        <div class="prob-item low">Lower: ${lowerProb}%</div>
+    `;
 }
 
 // Get card value for comparison
@@ -565,7 +738,7 @@ function resetGame() {
     gameState.isAnimating = false;
     
     // Clear cards area (except indicators)
-    const indicators = cardsArea.querySelectorAll('.lucky-charm-indicator');
+    const indicators = cardsArea.querySelectorAll('.lucky-charm-indicator, .jokers-wild-indicator, .mulligan-indicator');
     cardsArea.innerHTML = '';
     indicators.forEach(ind => cardsArea.appendChild(ind));
     
@@ -691,14 +864,23 @@ function exitTrashGame() {
 
 // Buy powerup - Updated to allow stacking
 function buyPowerup(item) {
-    const costs = {
+    const baseCosts = {
         wildcard: 100,
         passive: 200,
         lucky: 150,
-        insurance: 75
+        insurance: 75,
+        doubleOrNothingMaster: 2000,
+        mulligan: 250,
+        jokersWild: 500,
+        compoundInterest: 500
     };
     
-    const cost = costs[item];
+    // Calculate compound interest cost
+    let cost = baseCosts[item];
+    if (item === 'compoundInterest') {
+        cost = 500 + (gameState.powerups.compoundInterestPurchases * 250);
+    }
+    
     if (gameState.balance < cost) {
         alert('Insufficient funds!');
         return;
@@ -708,24 +890,48 @@ function buyPowerup(item) {
     
     switch(item) {
         case 'wildcard':
-            // Add a wildcard to the deck permanently
             gameState.powerups.wildcardsInDeck += 1;
             alert(`Wild Card added to deck! Total wildcards in deck: ${gameState.powerups.wildcardsInDeck}`);
             break;
         case 'passive':
-            // Increase passive income by 5
             gameState.powerups.passiveIncome += 5;
             alert(`Passive Income increased! Now earning ${gameState.powerups.passiveIncome}gc per round.`);
             break;
         case 'lucky':
-            // Add 5 rounds
             gameState.powerups.lucky += 5;
             alert(`Lucky Charm extended! Now active for ${gameState.powerups.lucky} rounds.`);
             break;
         case 'insurance':
-            // Add 3 rounds
             gameState.powerups.insurance += 3;
             alert(`Insurance extended! Now active for ${gameState.powerups.insurance} rounds.`);
+            break;
+        case 'doubleOrNothingMaster':
+            if (gameState.powerups.doubleOrNothingMaster) {
+                alert('You already own Double or Nothing Master!');
+                gameState.balance += cost; // Refund
+                return;
+            }
+            gameState.powerups.doubleOrNothingMaster = true;
+            alert('Double or Nothing Master purchased! You can now see probabilities in the double game.');
+            break;
+        case 'mulligan':
+            gameState.powerups.mulligan += 1;
+            alert(`Mulligan purchased! Total mulligans: ${gameState.powerups.mulligan}`);
+            break;
+        case 'jokersWild':
+            gameState.powerups.jokersWild += 5;
+            alert(`Joker's Wild activated! All Jacks are wild for ${gameState.powerups.jokersWild} rounds.`);
+            break;
+        case 'compoundInterest':
+            gameState.powerups.compoundInterest += 1;
+            gameState.powerups.compoundInterestPurchases += 1;
+            alert(`Compound Interest increased! Now earning ${gameState.powerups.compoundInterest}% interest per round.`);
+            // Update the button text with new cost
+            const btn = document.querySelector('[data-item="compoundInterest"]');
+            if (btn) {
+                const newCost = 500 + (gameState.powerups.compoundInterestPurchases * 250);
+                btn.parentElement.querySelector('.price').textContent = `Cost: ${newCost}gc`;
+            }
             break;
     }
     
@@ -749,6 +955,21 @@ function showSection(sectionId) {
     if (sectionId === 'trash-game' && !gameState.trashGameInterval) {
         startTrashGame();
     }
+    
+    // Update shop prices if entering shop
+    if (sectionId === 'shop') {
+        updateShopPrices();
+    }
+}
+
+// Update shop prices
+function updateShopPrices() {
+    // Update compound interest price
+    const compoundBtn = document.querySelector('[data-item="compoundInterest"]');
+    if (compoundBtn) {
+        const newCost = 500 + (gameState.powerups.compoundInterestPurchases * 250);
+        compoundBtn.parentElement.querySelector('.price').textContent = `Cost: ${newCost}gc`;
+    }
 }
 
 // Update display
@@ -765,12 +986,7 @@ function updateDisplay() {
         insuranceIndicatorEl.classList.remove('active');
     }
     
-    if (gameState.powerups.lucky > 0) {
-        luckyCharmIndicatorEl.classList.add('active');
-        luckyRoundsEl.textContent = gameState.powerups.lucky;
-    } else {
-        luckyCharmIndicatorEl.classList.remove('active');
-    }
+    updateCardAreaIndicators();
     
     // Update powerups display
     powerupListEl.innerHTML = '';
@@ -786,6 +1002,18 @@ function updateDisplay() {
     }
     if (gameState.powerups.insurance > 0) {
         addPowerupDisplay(`Insurance (${gameState.powerups.insurance} rounds)`);
+    }
+    if (gameState.powerups.doubleOrNothingMaster) {
+        addPowerupDisplay('Double or Nothing Master');
+    }
+    if (gameState.powerups.mulligan > 0) {
+        addPowerupDisplay(`Mulligans: ${gameState.powerups.mulligan}`);
+    }
+    if (gameState.powerups.jokersWild > 0) {
+        addPowerupDisplay(`Joker's Wild (${gameState.powerups.jokersWild} rounds)`);
+    }
+    if (gameState.powerups.compoundInterest > 0) {
+        addPowerupDisplay(`Compound Interest: ${gameState.powerups.compoundInterest}%`);
     }
     
     saveGameState();
@@ -828,7 +1056,12 @@ function loadGameState() {
                 wildcardsInDeck: 0,
                 passiveIncome: 0,
                 lucky: 0,
-                insurance: 0
+                insurance: 0,
+                doubleOrNothingMaster: false,
+                mulligan: 0,
+                jokersWild: 0,
+                compoundInterest: 0,
+                compoundInterestPurchases: 0
             };
             
             // Handle old save format
@@ -843,6 +1076,20 @@ function loadGameState() {
                     gameState.powerups.passiveIncome = 5;
                 } else if (typeof data.powerups.passiveIncome === 'undefined') {
                     gameState.powerups.passiveIncome = 0;
+                }
+                // Initialize new powerups if not present
+                if (typeof data.powerups.doubleOrNothingMaster === 'undefined') {
+                    gameState.powerups.doubleOrNothingMaster = false;
+                }
+                if (typeof data.powerups.mulligan === 'undefined') {
+                    gameState.powerups.mulligan = 0;
+                }
+                if (typeof data.powerups.jokersWild === 'undefined') {
+                    gameState.powerups.jokersWild = 0;
+                }
+                if (typeof data.powerups.compoundInterest === 'undefined') {
+                    gameState.powerups.compoundInterest = 0;
+                    gameState.powerups.compoundInterestPurchases = 0;
                 }
             }
             
