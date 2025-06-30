@@ -37,6 +37,7 @@
             <div class="action-area" id="action-area" style="display: none;">
                 <button id="discard-btn" class="btn secondary">Discard Selected</button>
                 <button id="hold-btn" class="btn primary">Hold All</button>
+                <button id="mulligan-btn" class="btn mulligan" onclick="useMulligan()" style="display: none;">Use Mulligan</button>
             </div>
 
             <div class="result-area" id="result-area" style="display: none;">
@@ -111,6 +112,30 @@
                     <p>Keep 50% of bet on loss (3 rounds)</p>
                     <p class="price">Cost: 75gc</p>
                     <button class="btn buy-btn" data-item="insurance">Buy</button>
+                </div>
+                <div class="shop-item">
+                    <h3>Double or Nothing Master</h3>
+                    <p>See win probabilities in the double game (permanent)</p>
+                    <p class="price">Cost: 2000gc</p>
+                    <button class="btn buy-btn" data-item="doubleOrNothingMaster">Buy</button>
+                </div>
+                <div class="shop-item">
+                    <h3>Mulligan</h3>
+                    <p>Redraw your entire hand without losing your bet (single use)</p>
+                    <p class="price">Cost: 250gc</p>
+                    <button class="btn buy-btn" data-item="mulligan">Buy</button>
+                </div>
+                <div class="shop-item">
+                    <h3>Joker's Wild</h3>
+                    <p>All Jacks become wild cards (5 rounds)</p>
+                    <p class="price">Cost: 500gc</p>
+                    <button class="btn buy-btn" data-item="jokersWild">Buy</button>
+                </div>
+                <div class="shop-item">
+                    <h3>Compound Interest</h3>
+                    <p>Earn 1% interest on your balance per round (stacks)</p>
+                    <p class="price">Cost: 500gc</p>
+                    <button class="btn buy-btn" data-item="compoundInterest">Buy</button>
                 </div>
             </div>
             <button id="close-shop-btn" class="btn primary">Close Shop</button>
