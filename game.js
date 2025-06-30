@@ -357,8 +357,11 @@ function dealSingleCard(index) {
 function toggleCardSelection(index) {
     if (gameState.hasDiscarded || gameState.isAnimating) return;
     
-    const indicatorCount = cardsArea.querySelectorAll('.lucky-charm-indicator.active, .jokers-wild-indicator.active, .mulligan-indicator.active').length;
-    const cardEl = cardsArea.children[index + indicatorCount];
+    // Get all card elements (not indicators)
+    const allCards = Array.from(cardsArea.children).filter(el => el.classList.contains('card'));
+    const cardEl = allCards[index];
+    
+    if (!cardEl) return;
     
     if (gameState.selectedCards.includes(index)) {
         gameState.selectedCards = gameState.selectedCards.filter(i => i !== index);
@@ -382,12 +385,15 @@ async function discardSelected() {
     const deck = shuffleDeck(createDeck());
     let deckIndex = 0;
     
-    const indicatorCount = cardsArea.querySelectorAll('.lucky-charm-indicator.active, .jokers-wild-indicator.active, .mulligan-indicator.active').length;
+    // Get all card elements (not indicators)
+    const allCards = Array.from(cardsArea.children).filter(el => el.classList.contains('card'));
     
     // Animate discarding cards
     for (const cardIndex of gameState.selectedCards) {
-        const cardEl = cardsArea.children[cardIndex + indicatorCount];
-        cardEl.classList.add('discarding');
+        const cardEl = allCards[cardIndex];
+        if (cardEl) {
+            cardEl.classList.add('discarding');
+        }
     }
     
     await sleep(500);
@@ -396,7 +402,10 @@ async function discardSelected() {
     for (const cardIndex of gameState.selectedCards) {
         gameState.currentHand[cardIndex] = deck[deckIndex++];
         const card = gameState.currentHand[cardIndex];
-        const cardEl = cardsArea.children[cardIndex + indicatorCount];
+        const cardEl = allCards[cardIndex];
+        
+        if (!cardEl) continue;
+        
         const isWild = card.isWild || (gameState.powerups.jokersWild > 0 && card.rank === 'J');
         const isLucky = gameState.powerups.lucky > 0;
         
@@ -420,7 +429,11 @@ async function discardSelected() {
         // Re-add click listener
         const newCardEl = cardEl.cloneNode(true);
         cardEl.parentNode.replaceChild(newCardEl, cardEl);
-        newCardEl.addEventListener('click', () => toggleCardSelection(cardIndex));
+        
+        // Create a closure to capture the correct index
+        (function(idx) {
+            newCardEl.addEventListener('click', () => toggleCardSelection(idx));
+        })(cardIndex);
     }
     
     gameState.hasDiscarded = true;
@@ -428,67 +441,58 @@ async function discardSelected() {
     gameState.isAnimating = false;
     
     discardBtn.style.display = 'none';
-    document.getElementById('mulligan-btn').style.display = 'none';
+    const mulliganBtn = document.getElementById('mulligan-btn');
+    if (mulliganBtn) {
+        mulliganBtn.style.display = 'none';
+    }
     
     // Wait a moment before evaluating
     await sleep(1000);
     evaluateHand(true);
 }
 
-// Evaluate hand
-async function evaluateHand(fromDiscard) {
-    if (gameState.isAnimating && !fromDiscard) return;
+// Use mulligan
+async function useMulligan() {
+    if (gameState.powerups.mulligan <= 0 || gameState.isAnimating) return;
     
-    const hand = gameState.currentHand;
-    const result = getHandRank(hand);
+    gameState.isAnimating = true;
+    gameState.powerups.mulligan--;
     
-    // Count and remove used wildcards from deck
-    const wildcardsUsed = hand.filter(card => card.isWild && card.rank === 'W').length;
-    if (wildcardsUsed > 0) {
-        gameState.powerups.wildcardsInDeck -= wildcardsUsed;
-        console.log(`Used ${wildcardsUsed} wildcard(s). ${gameState.powerups.wildcardsInDeck} remaining in deck.`);
+    // Get all card elements (not indicators)
+    const allCards = Array.from(cardsArea.children).filter(el => el.classList.contains('card'));
+    
+    // Animate cards swirling away
+    allCards.forEach((card, index) => {
+        setTimeout(() => {
+            card.style.animation = 'mulliganSwirl 0.6s ease-out forwards';
+        }, index * 50);
+    });
+    
+    await sleep(800);
+    
+    // Deal new hand
+    const deck = shuffleDeck(createDeck());
+    gameState.currentHand = deck.slice(0, 5);
+    gameState.selectedCards = [];
+    
+    // Remove old cards
+    allCards.forEach(card => card.remove());
+    
+    // Deal new cards
+    for (let i = 0; i < 5; i++) {
+        await dealSingleCard(i);
+        await sleep(100);
     }
     
-    const winnings = Math.floor(gameState.currentBet * result.multiplier);
-    gameState.doubleWinnings = winnings;
-    
-    // Show result with animation
-    handResultEl.textContent = result.name;
-    handResultEl.style.animation = 'none';
-    setTimeout(() => {
-        handResultEl.style.animation = 'fadeInScale 0.5s ease-out forwards';
-    }, 10);
-    
-    if (winnings > 0) {
-        winningsEl.textContent = `You won ${winnings}gc!`;
-        if (wildcardsUsed > 0) {
-            winningsEl.textContent += ` (Used ${wildcardsUsed} wildcard${wildcardsUsed > 1 ? 's' : ''})`;
+    // Hide mulligan button if no more uses
+    if (gameState.powerups.mulligan <= 0) {
+        const mulliganBtn = document.getElementById('mulligan-btn');
+        if (mulliganBtn) {
+            mulliganBtn.style.display = 'none';
         }
-        doubleBtn.style.display = 'inline-block';
-        collectBtn.style.display = 'inline-block';
-    } else {
-        winningsEl.textContent = 'No win this time.';
-        doubleBtn.style.display = 'none';
-        collectBtn.style.display = 'none';
-        
-        // Apply insurance if active
-        if (gameState.powerups.insurance > 0) {
-            const refund = Math.floor(gameState.currentBet * 0.5);
-            gameState.balance += refund;
-            winningsEl.textContent += ` (Insurance: +${refund}gc)`;
-            gameState.powerups.insurance--;
-        }
-        
-        setTimeout(resetGame, 3000);
     }
     
-    actionArea.style.display = 'none';
-    resultArea.style.display = 'block';
-    
-    // Update powerup counters
-    if (gameState.powerups.lucky > 0) gameState.powerups.lucky--;
-    if (gameState.powerups.jokersWild > 0) gameState.powerups.jokersWild--;
-    
+    gameState.isAnimating = false;
     updateDisplay();
 }
 
