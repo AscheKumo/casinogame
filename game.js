@@ -203,9 +203,11 @@ async function useMulligan() {
     gameState.isAnimating = true;
     gameState.powerups.mulligan--;
     
+    // Get all card elements (not indicators)
+    const allCards = Array.from(cardsArea.children).filter(el => el.classList.contains('card'));
+    
     // Animate cards swirling away
-    const cards = cardsArea.querySelectorAll('.card');
-    cards.forEach((card, index) => {
+    allCards.forEach((card, index) => {
         setTimeout(() => {
             card.style.animation = 'mulliganSwirl 0.6s ease-out forwards';
         }, index * 50);
@@ -218,8 +220,8 @@ async function useMulligan() {
     gameState.currentHand = deck.slice(0, 5);
     gameState.selectedCards = [];
     
-    // Clear cards
-    cards.forEach(card => card.remove());
+    // Remove old cards
+    allCards.forEach(card => card.remove());
     
     // Deal new cards
     for (let i = 0; i < 5; i++) {
@@ -451,48 +453,60 @@ async function discardSelected() {
     evaluateHand(true);
 }
 
-// Use mulligan
-async function useMulligan() {
-    if (gameState.powerups.mulligan <= 0 || gameState.isAnimating) return;
+// Evaluate hand
+async function evaluateHand(fromDiscard) {
+    if (gameState.isAnimating && !fromDiscard) return;
     
-    gameState.isAnimating = true;
-    gameState.powerups.mulligan--;
+    const hand = gameState.currentHand;
+    const result = getHandRank(hand);
     
-    // Get all card elements (not indicators)
-    const allCards = Array.from(cardsArea.children).filter(el => el.classList.contains('card'));
-    
-    // Animate cards swirling away
-    allCards.forEach((card, index) => {
-        setTimeout(() => {
-            card.style.animation = 'mulliganSwirl 0.6s ease-out forwards';
-        }, index * 50);
-    });
-    
-    await sleep(800);
-    
-    // Deal new hand
-    const deck = shuffleDeck(createDeck());
-    gameState.currentHand = deck.slice(0, 5);
-    gameState.selectedCards = [];
-    
-    // Remove old cards
-    allCards.forEach(card => card.remove());
-    
-    // Deal new cards
-    for (let i = 0; i < 5; i++) {
-        await dealSingleCard(i);
-        await sleep(100);
+    // Count and remove used wildcards from deck
+    const wildcardsUsed = hand.filter(card => card.isWild && card.rank === 'W').length;
+    if (wildcardsUsed > 0) {
+        gameState.powerups.wildcardsInDeck -= wildcardsUsed;
+        console.log(`Used ${wildcardsUsed} wildcard(s). ${gameState.powerups.wildcardsInDeck} remaining in deck.`);
     }
     
-    // Hide mulligan button if no more uses
-    if (gameState.powerups.mulligan <= 0) {
-        const mulliganBtn = document.getElementById('mulligan-btn');
-        if (mulliganBtn) {
-            mulliganBtn.style.display = 'none';
+    const winnings = Math.floor(gameState.currentBet * result.multiplier);
+    gameState.doubleWinnings = winnings;
+    
+    // Show result with animation
+    handResultEl.textContent = result.name;
+    handResultEl.style.animation = 'none';
+    setTimeout(() => {
+        handResultEl.style.animation = 'fadeInScale 0.5s ease-out forwards';
+    }, 10);
+    
+    if (winnings > 0) {
+        winningsEl.textContent = `You won ${winnings}gc!`;
+        if (wildcardsUsed > 0) {
+            winningsEl.textContent += ` (Used ${wildcardsUsed} wildcard${wildcardsUsed > 1 ? 's' : ''})`;
         }
+        doubleBtn.style.display = 'inline-block';
+        collectBtn.style.display = 'inline-block';
+    } else {
+        winningsEl.textContent = 'No win this time.';
+        doubleBtn.style.display = 'none';
+        collectBtn.style.display = 'none';
+        
+        // Apply insurance if active
+        if (gameState.powerups.insurance > 0) {
+            const refund = Math.floor(gameState.currentBet * 0.5);
+            gameState.balance += refund;
+            winningsEl.textContent += ` (Insurance: +${refund}gc)`;
+            gameState.powerups.insurance--;
+        }
+        
+        setTimeout(resetGame, 3000);
     }
     
-    gameState.isAnimating = false;
+    actionArea.style.display = 'none';
+    resultArea.style.display = 'block';
+    
+    // Update powerup counters
+    if (gameState.powerups.lucky > 0) gameState.powerups.lucky--;
+    if (gameState.powerups.jokersWild > 0) gameState.powerups.jokersWild--;
+    
     updateDisplay();
 }
 
@@ -1115,6 +1129,9 @@ function loadGameState() {
         }
     }
 }
+
+// Make useMulligan available globally
+window.useMulligan = useMulligan;
 
 // Initialize the game
 init();
