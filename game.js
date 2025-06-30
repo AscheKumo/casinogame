@@ -9,6 +9,7 @@ const gameState = {
     doubleRound: 0,
     hasDiscarded: false,
     isAnimating: false,
+    trashGameInterval: null,  // Add this to track the interval
     powerups: {
         wildcardsInDeck: 0,
         passiveIncome: 0,  // Changed to track amount instead of boolean
@@ -577,12 +578,17 @@ function resetGame() {
     if (gameState.balance <= 0) {
         alert('You\'re out of cash! Time to collect some trash!');
         showSection('trash-game');
-        startTrashGame();
     }
 }
 
 // Start trash collection game
 function startTrashGame() {
+    // Clear any existing interval first
+    if (gameState.trashGameInterval) {
+        clearInterval(gameState.trashGameInterval);
+        gameState.trashGameInterval = null;
+    }
+    
     const trashArea = document.getElementById('trash-area');
     trashArea.innerHTML = '';
     
@@ -662,10 +668,11 @@ function startTrashGame() {
         setTimeout(() => spawnTrash(), i * 200);
     }
     
-    // Spawn trash every 800ms
-    const trashInterval = setInterval(() => {
+    // Spawn trash every 800ms and store the interval
+    gameState.trashGameInterval = setInterval(() => {
         if (document.getElementById('trash-game').style.display === 'none') {
-            clearInterval(trashInterval);
+            clearInterval(gameState.trashGameInterval);
+            gameState.trashGameInterval = null;
         } else {
             spawnTrash();
         }
@@ -674,6 +681,11 @@ function startTrashGame() {
 
 // Exit trash game
 function exitTrashGame() {
+    // Clear the interval when exiting
+    if (gameState.trashGameInterval) {
+        clearInterval(gameState.trashGameInterval);
+        gameState.trashGameInterval = null;
+    }
     showSection('main-game');
 }
 
@@ -722,12 +734,19 @@ function buyPowerup(item) {
 
 // Show section
 function showSection(sectionId) {
+    // Clear trash game interval if leaving trash game
+    if (sectionId !== 'trash-game' && gameState.trashGameInterval) {
+        clearInterval(gameState.trashGameInterval);
+        gameState.trashGameInterval = null;
+    }
+    
     document.querySelectorAll('.game-section').forEach(section => {
         section.style.display = 'none';
     });
     document.getElementById(sectionId).style.display = 'block';
     
-    if (sectionId === 'trash-game') {
+    // Only start trash game if not already running
+    if (sectionId === 'trash-game' && !gameState.trashGameInterval) {
         startTrashGame();
     }
 }
