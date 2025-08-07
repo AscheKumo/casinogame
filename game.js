@@ -1,6 +1,6 @@
 // Game State
 const gameState = {
-    balance: 500,
+    balance: 200, // Reduced starting balance for better progression
     jackpot: 0,
     currentBet: 0,
     currentHand: [],
@@ -10,6 +10,15 @@ const gameState = {
     hasDiscarded: false,
     isAnimating: false,
     trashGameInterval: null,
+    dailyTrashEarnings: 0, // Track daily trash earnings
+    lastTrashReset: new Date().toDateString(), // Reset trash earnings daily
+    achievements: {
+        firstWin: false,
+        royalFlush: false,
+        bigWin: false, // Win 100gc+ in single hand
+        millionaire: false, // Reach 1000gc
+        shopaholic: false // Buy 5 powerups
+    },
     powerups: {
         wildcardsInDeck: 0,
         passiveIncome: 0,
@@ -470,6 +479,9 @@ async function evaluateHand(fromDiscard) {
     const winnings = Math.floor(gameState.currentBet * result.multiplier);
     gameState.doubleWinnings = winnings;
     
+    // Check for achievements
+    checkAchievements(result.name, winnings);
+    
     // Show result with animation
     handResultEl.textContent = result.name;
     handResultEl.style.animation = 'none';
@@ -570,11 +582,17 @@ function getHandRank(hand) {
     } else if (straightResult) {
         return { name: 'Straight!', multiplier: 5 };
     } else if (groups[0] === 3) {
-        return { name: 'Three of a Kind!', multiplier: 3 };
+        return { name: 'Three of a Kind!', multiplier: 4 };
     } else if (groups[0] === 2 && groups[1] === 2) {
-        return { name: 'Two Pair!', multiplier: 2 };
+        return { name: 'Two Pair!', multiplier: 3 };
     } else if (groups[0] === 2) {
-        return { name: 'One Pair', multiplier: 1 };
+        // Check if it's Jacks or better
+        const pairValue = findPairValue(regularCards, wildcards);
+        if (pairValue >= 11) { // Jacks (11) or better
+            return { name: 'Pair of Jacks or Better!', multiplier: 1.5 };
+        } else {
+            return { name: 'Low Pair', multiplier: 0 }; // No payout for low pairs
+        }
     } else {
         return { name: 'High Card', multiplier: 0 };
     }
@@ -612,6 +630,33 @@ function getGroups(cards) {
     });
     
     return Object.values(counts).sort((a, b) => b - a);
+}
+
+// Find the value of the pair for Jacks or better check
+function findPairValue(cards, wildcards) {
+    const counts = {};
+    cards.forEach(card => {
+        counts[card.value] = (counts[card.value] || 0) + 1;
+    });
+    
+    // If we have wildcards, they can form pairs with any card
+    if (wildcards > 0) {
+        // Find the highest single card that can be paired with wildcards
+        const singleCards = Object.keys(counts).filter(value => counts[value] === 1);
+        if (singleCards.length > 0) {
+            return Math.max(...singleCards.map(v => parseInt(v)));
+        }
+        // If no single cards, wildcards form a pair of Aces (highest value)
+        return 14;
+    }
+    
+    // Find the value of the pair
+    for (const [value, count] of Object.entries(counts)) {
+        if (count === 2) {
+            return parseInt(value);
+        }
+    }
+    return 0;
 }
 
 // Start double or nothing game
@@ -774,6 +819,21 @@ function resetGame() {
 
 // Start trash collection game
 function startTrashGame() {
+    // Check daily reset
+    const today = new Date().toDateString();
+    if (gameState.lastTrashReset !== today) {
+        gameState.dailyTrashEarnings = 0;
+        gameState.lastTrashReset = today;
+    }
+    
+    // Check daily limit (reduced to 50gc per day)
+    const dailyLimit = 50;
+    if (gameState.dailyTrashEarnings >= dailyLimit) {
+        alert(`Daily trash collection limit reached! You've earned ${gameState.dailyTrashEarnings}gc today. Come back tomorrow!`);
+        showSection('main-game');
+        return;
+    }
+    
     // Clear any existing interval first
     if (gameState.trashGameInterval) {
         clearInterval(gameState.trashGameInterval);
@@ -796,10 +856,17 @@ function startTrashGame() {
             return;
         }
         
+        // Check if daily limit is reached
+        if (gameState.dailyTrashEarnings >= dailyLimit) {
+            alert(`Daily limit reached! You've earned ${dailyLimit}gc from trash today.`);
+            exitTrashGame();
+            return;
+        }
+        
         const trash = document.createElement('div');
         
-        // 1 in 50 chance for a rare coin
-        const isRareCoin = Math.random() < 0.02; // 2% chance = 1 in 50
+        // Reduced chance for rare coin (1 in 100 = 1%)
+        const isRareCoin = Math.random() < 0.01;
         
         if (isRareCoin) {
             trash.className = 'trash-item rare-coin';
@@ -816,10 +883,13 @@ function startTrashGame() {
             trash.classList.add('collecting');
             
             if (isRareCoin) {
+                // Reduced rare coin value
+                const coinValue = 25; // Reduced from 100gc
+                
                 // Show special effect for rare coin
                 const bonus = document.createElement('div');
                 bonus.className = 'coin-bonus-text';
-                bonus.textContent = '+100gc!!!';
+                bonus.textContent = `+${coinValue}gc!`;
                 bonus.style.left = trash.style.left;
                 bonus.style.top = trash.style.top;
                 trashArea.appendChild(bonus);
@@ -827,13 +897,15 @@ function startTrashGame() {
                 setTimeout(() => bonus.remove(), 1500);
                 
                 coinsFound++;
-                gameState.balance += 100;
-                document.getElementById('trash-earned').textContent = collected + (coinsFound * 100);
+                gameState.balance += coinValue;
+                gameState.dailyTrashEarnings += coinValue;
+                document.getElementById('trash-earned').textContent = collected + (coinsFound * coinValue);
             } else {
                 collected++;
                 gameState.balance++;
+                gameState.dailyTrashEarnings++;
                 document.getElementById('trash-collected').textContent = collected;
-                document.getElementById('trash-earned').textContent = collected + (coinsFound * 100);
+                document.getElementById('trash-earned').textContent = collected + (coinsFound * 25);
             }
             
             updateDisplay();
@@ -845,29 +917,29 @@ function startTrashGame() {
         
         trashArea.appendChild(trash);
         
-        // Remove after 3 seconds if not clicked (rare coins last longer)
+        // Remove after 4 seconds if not clicked (increased from 3)
         setTimeout(() => {
             if (trash.parentNode) {
                 trash.style.opacity = '0.3';
                 setTimeout(() => trash.remove(), 500);
             }
-        }, isRareCoin ? 5000 : 3000);
+        }, isRareCoin ? 6000 : 4000);
     };
     
     // Initial spawn
-    for (let i = 0; i < 3; i++) {
-        setTimeout(() => spawnTrash(), i * 200);
+    for (let i = 0; i < 2; i++) { // Reduced from 3 to 2
+        setTimeout(() => spawnTrash(), i * 300);
     }
     
-    // Spawn trash every 800ms and store the interval
+    // Spawn trash every 1500ms (increased from 800ms) and store the interval
     gameState.trashGameInterval = setInterval(() => {
         if (document.getElementById('trash-game').style.display === 'none') {
             clearInterval(gameState.trashGameInterval);
             gameState.trashGameInterval = null;
-        } else {
+        } else if (gameState.dailyTrashEarnings < dailyLimit) {
             spawnTrash();
         }
-    }, 800);
+    }, 1500);
 }
 
 // Exit trash game
@@ -883,20 +955,20 @@ function exitTrashGame() {
 // Buy powerup - Updated to allow stacking
 function buyPowerup(item) {
     const baseCosts = {
-        wildcard: 100,
-        passive: 200,
-        lucky: 150,
-        insurance: 75,
-        doubleOrNothingMaster: 2000,
-        mulligan: 250,
-        jokersWild: 500,
-        compoundInterest: 500
+        wildcard: 150, // Increased from 100
+        passive: 300, // Increased from 200
+        lucky: 200, // Increased from 150
+        insurance: 150, // Increased from 75 (doubled)
+        doubleOrNothingMaster: 2000, // Unchanged
+        mulligan: 300, // Increased from 250
+        jokersWild: 600, // Increased from 500
+        compoundInterest: 800 // Increased from 500
     };
     
-    // Calculate compound interest cost
+    // Calculate compound interest cost with steeper scaling
     let cost = baseCosts[item];
     if (item === 'compoundInterest') {
-        cost = 500 + (gameState.powerups.compoundInterestPurchases * 250);
+        cost = 800 + (gameState.powerups.compoundInterestPurchases * 400);
     }
     
     if (gameState.balance < cost) {
@@ -947,13 +1019,23 @@ function buyPowerup(item) {
             // Update the button text with new cost
             const btn = document.querySelector('[data-item="compoundInterest"]');
             if (btn) {
-                const newCost = 500 + (gameState.powerups.compoundInterestPurchases * 250);
+                const newCost = 800 + (gameState.powerups.compoundInterestPurchases * 400);
                 btn.parentElement.querySelector('.price').textContent = `Cost: ${newCost}gc`;
             }
             break;
     }
     
     updateDisplay();
+    
+    // Check shopaholic achievement
+    const totalPowerups = Object.values(gameState.powerups).reduce((total, value) => {
+        return total + (typeof value === 'number' ? value : (value ? 1 : 0));
+    }, 0);
+    
+    if (!gameState.achievements.shopaholic && totalPowerups >= 5) {
+        gameState.achievements.shopaholic = true;
+        showAchievement("🛍️ Shopaholic! - Bought 5 powerups!");
+    }
 }
 
 // Show section
@@ -985,7 +1067,7 @@ function updateShopPrices() {
     // Update compound interest price
     const compoundBtn = document.querySelector('[data-item="compoundInterest"]');
     if (compoundBtn) {
-        const newCost = 500 + (gameState.powerups.compoundInterestPurchases * 250);
+        const newCost = 800 + (gameState.powerups.compoundInterestPurchases * 400);
         compoundBtn.parentElement.querySelector('.price').textContent = `Cost: ${newCost}gc`;
     }
 }
@@ -994,7 +1076,16 @@ function updateShopPrices() {
 function updateDisplay() {
     balanceEl.textContent = gameState.balance;
     jackpotEl.textContent = gameState.jackpot;
-    betAmountEl.max = gameState.balance;
+    
+    // Dynamic betting limits based on balance
+    let maxBet = 10; // Base limit
+    if (gameState.balance >= 100) maxBet = 25;
+    if (gameState.balance >= 300) maxBet = 50;
+    if (gameState.balance >= 500) maxBet = 100;
+    if (gameState.balance >= 1000) maxBet = 200;
+    if (gameState.balance >= 2000) maxBet = 500;
+    
+    betAmountEl.max = Math.min(maxBet, gameState.balance);
     
     // Update visual indicators
     if (gameState.powerups.insurance > 0) {
@@ -1049,6 +1140,48 @@ function addPowerupDisplay(text) {
 function sleep(ms) {
     return new Promise(resolve => setTimeout(resolve, ms));
 }
+function checkAchievements(handResult, winnings) {
+    let newAchievements = [];
+    
+    // First win achievement
+    if (!gameState.achievements.firstWin && winnings > 0) {
+        gameState.achievements.firstWin = true;
+        newAchievements.push("🎉 First Win! - You won your first hand!");
+    }
+    
+    // Royal Flush achievement
+    if (!gameState.achievements.royalFlush && handResult.includes('Royal Flush')) {
+        gameState.achievements.royalFlush = true;
+        newAchievements.push("👑 Royal Flush! - The ultimate poker hand!");
+    }
+    
+    // Big win achievement
+    if (!gameState.achievements.bigWin && winnings >= 100) {
+        gameState.achievements.bigWin = true;
+        newAchievements.push("💰 Big Win! - Won 100gc+ in a single hand!");
+    }
+    
+    // Millionaire achievement
+    if (!gameState.achievements.millionaire && gameState.balance >= 1000) {
+        gameState.achievements.millionaire = true;
+        newAchievements.push("🏆 Millionaire! - Reached 1000gc balance!");
+    }
+    
+    // Show achievement notifications
+    newAchievements.forEach((achievement, index) => {
+        setTimeout(() => showAchievement(achievement), index * 2000);
+    });
+}
+
+// Show achievement notification
+function showAchievement(text) {
+    const notification = document.createElement('div');
+    notification.className = 'achievement-notification';
+    notification.textContent = text;
+    document.body.appendChild(notification);
+    
+    setTimeout(() => notification.remove(), 4000);
+}
 
 // Save game state - only persistent data
 function saveGameState() {
@@ -1056,6 +1189,9 @@ function saveGameState() {
         balance: gameState.balance,
         jackpot: gameState.jackpot,
         powerups: gameState.powerups,
+        dailyTrashEarnings: gameState.dailyTrashEarnings,
+        lastTrashReset: gameState.lastTrashReset,
+        achievements: gameState.achievements,
         lastSaved: new Date().toISOString()
     };
     localStorage.setItem('pokerGameState', JSON.stringify(persistentData));
@@ -1068,8 +1204,17 @@ function loadGameState() {
         try {
             const data = JSON.parse(saved);
             // Only load persistent data, not current game state
-            gameState.balance = data.balance || 500;
+            gameState.balance = data.balance || 200; // Updated default
             gameState.jackpot = data.jackpot || 0;
+            gameState.dailyTrashEarnings = data.dailyTrashEarnings || 0;
+            gameState.lastTrashReset = data.lastTrashReset || new Date().toDateString();
+            gameState.achievements = data.achievements || {
+                firstWin: false,
+                royalFlush: false,
+                bigWin: false,
+                millionaire: false,
+                shopaholic: false
+            };
             gameState.powerups = data.powerups || {
                 wildcardsInDeck: 0,
                 passiveIncome: 0,
@@ -1124,8 +1269,17 @@ function loadGameState() {
         } catch (e) {
             console.error('Error loading saved game:', e);
             // Reset to defaults if there's an error
-            gameState.balance = 500;
+            gameState.balance = 200; // Updated default
             gameState.jackpot = 0;
+            gameState.dailyTrashEarnings = 0;
+            gameState.lastTrashReset = new Date().toDateString();
+            gameState.achievements = {
+                firstWin: false,
+                royalFlush: false,
+                bigWin: false,
+                millionaire: false,
+                shopaholic: false
+            };
         }
     }
 }

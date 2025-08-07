@@ -11,7 +11,7 @@
         <header>
             <h1>Royal Flush Casino</h1>
             <div class="stats">
-                <div class="balance">Balance: <span id="balance">500</span>gc</div>
+                <div class="balance">Balance: <span id="balance">200</span>gc</div>
                 <div class="jackpot">Jackpot: <span id="jackpot">0</span>gc</div>
             </div>
         </header>
@@ -23,7 +23,7 @@
                     Insurance Active (<span id="insurance-rounds">0</span> rounds)
                 </div>
                 <label for="bet-amount">Bet Amount:</label>
-                <input type="number" id="bet-amount" min="1" max="500" value="10">
+                <input type="number" id="bet-amount" min="1" max="200" value="10">
                 <button id="deal-btn" class="btn primary">Deal Cards</button>
             </div>
 
@@ -74,7 +74,7 @@
 
         <!-- Trash Collection Minigame -->
         <div id="trash-game" class="game-section" style="display: none;">
-            <h2>Trash Collection - Earn 1gc per item</h2>
+            <h2>Trash Collection - Earn 1gc per item (50gc daily limit)</h2>
             <div class="trash-stats">
                 <p>Items Collected: <span id="trash-collected">0</span></p>
                 <p>Earned: <span id="trash-earned">0</span>gc</p>
@@ -92,25 +92,25 @@
                 <div class="shop-item">
                     <h3>Wild Card</h3>
                     <p>Adds a permanent wild card to the deck (removed when used)</p>
-                    <p class="price">Cost: 100gc</p>
+                    <p class="price">Cost: 150gc</p>
                     <button class="btn buy-btn" data-item="wildcard">Buy</button>
                 </div>
                 <div class="shop-item">
                     <h3>Passive Income</h3>
                     <p>Earn +5gc per round (stacks with each purchase)</p>
-                    <p class="price">Cost: 200gc</p>
+                    <p class="price">Cost: 300gc</p>
                     <button class="btn buy-btn" data-item="passive">Buy</button>
                 </div>
                 <div class="shop-item">
                     <h3>Lucky Charm</h3>
                     <p>+10% chance for better hands (5 rounds)</p>
-                    <p class="price">Cost: 150gc</p>
+                    <p class="price">Cost: 200gc</p>
                     <button class="btn buy-btn" data-item="lucky">Buy</button>
                 </div>
                 <div class="shop-item">
                     <h3>Insurance</h3>
                     <p>Keep 50% of bet on loss (3 rounds)</p>
-                    <p class="price">Cost: 75gc</p>
+                    <p class="price">Cost: 150gc</p>
                     <button class="btn buy-btn" data-item="insurance">Buy</button>
                 </div>
                 <div class="shop-item">
@@ -122,19 +122,19 @@
                 <div class="shop-item">
                     <h3>Mulligan</h3>
                     <p>Redraw your entire hand without losing your bet (single use)</p>
-                    <p class="price">Cost: 250gc</p>
+                    <p class="price">Cost: 300gc</p>
                     <button class="btn buy-btn" data-item="mulligan">Buy</button>
                 </div>
                 <div class="shop-item">
                     <h3>Joker's Wild</h3>
                     <p>All Jacks become wild cards (5 rounds)</p>
-                    <p class="price">Cost: 500gc</p>
+                    <p class="price">Cost: 600gc</p>
                     <button class="btn buy-btn" data-item="jokersWild">Buy</button>
                 </div>
                 <div class="shop-item">
                     <h3>Compound Interest</h3>
                     <p>Earn 1% interest on your balance per round (stacks)</p>
-                    <p class="price">Cost: 500gc</p>
+                    <p class="price">Cost: 800gc</p>
                     <button class="btn buy-btn" data-item="compoundInterest">Buy</button>
                 </div>
             </div>

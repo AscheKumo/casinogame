@@ -823,6 +823,47 @@ h1 {
     border-radius: 5px;
 }
 
+/* Achievement notification */
+.achievement-notification {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background: linear-gradient(135deg, #ffd700, #ff8c00);
+    color: #000;
+    padding: 20px 30px;
+    border-radius: 15px;
+    font-size: 1.2em;
+    font-weight: bold;
+    box-shadow: 0 10px 30px rgba(255, 215, 0, 0.6);
+    animation: achievementPop 4s ease-out forwards;
+    z-index: 2000;
+    max-width: 300px;
+    text-align: center;
+}
+
+@keyframes achievementPop {
+    0% {
+        transform: translate(-50%, -50%) scale(0);
+        opacity: 0;
+    }
+    15% {
+        transform: translate(-50%, -50%) scale(1.1);
+        opacity: 1;
+    }
+    25% {
+        transform: translate(-50%, -50%) scale(1);
+    }
+    85% {
+        transform: translate(-50%, -50%) scale(1);
+        opacity: 1;
+    }
+    100% {
+        transform: translate(-50%, -50%) scale(0.8);
+        opacity: 0;
+    }
+}
+
 @media (max-width: 768px) {
     .cards-area {
         gap: 10px;
